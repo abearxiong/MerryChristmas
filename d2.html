@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js 圣诞树动画</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #0a2e38, #1a5a7a);
+            font-family: 'Arial', sans-serif;
+        }
+        #container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            z-index: 100;
+            pointer-events: none;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="info">
+        <h1>圣诞快乐!</h1>
+        <p>使用Three.js创建的3D圣诞树</p>
+    </div>
+    <div id="loading">加载中...</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // 主程序
+        document.addEventListener('DOMContentLoaded', function() {
+            // 隐藏加载提示
+            document.getElementById('loading').style.display = 'none';
+            
+            // 初始化场景
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a2e38);
+            
+            // 初始化相机
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 15;
+            camera.position.y = 5;
+            
+            // 初始化渲染器
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // 添加环境光
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            
+            // 添加方向光
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 7);
+            scene.add(directionalLight);
+            
+            // 创建圣诞树
+            function createChristmasTree() {
+                const treeGroup = new THREE.Group();
+                
+                // 树干
+                const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.7, 2, 8);
+                const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                trunk.position.y = 1;
+                treeGroup.add(trunk);
+                
+                // 树冠 - 多层圆锥体
+                const treeLevels = 5;
+                for (let i = 0; i < treeLevels; i++) {
+                    const levelHeight = 2;
+                    const levelRadius = 3 - i * 0.5;
+                    const levelGeometry = new THREE.ConeGeometry(levelRadius, levelHeight, 8);
+                    const levelMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+                    const level = new THREE.Mesh(levelGeometry, levelMaterial);
+                    level.position.y = 2 + i * 1.5;
+                    treeGroup.add(level);
+                }
+                
+                // 树顶星星
+                const starGeometry = new THREE.SphereGeometry(0.5, 8, 6);
+                const starMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFF00 });
+                const star = new THREE.Mesh(starGeometry, starMaterial);
+                star.position.y = 10;
+                treeGroup.add(star);
+                
+                // 添加闪烁灯光
+                const lightColors = [0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xFF00FF, 0x00FFFF];
+                const lights = [];
+                
+                for (let i = 0; i < 30; i++) {
+                    const lightGeometry = new THREE.SphereGeometry(0.1, 6, 6);
+                    const lightMaterial = new THREE.MeshLambertMaterial({ 
+                        color: lightColors[Math.floor(Math.random() * lightColors.length)] 
+                    });
+                    const light = new THREE.Mesh(lightGeometry, lightMaterial);
+                    
+                    // 随机分布在树上
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 1 + Math.random() * 2.5;
+                    const height = 2 + Math.random() * 8;
+                    
+                    light.position.x = Math.cos(angle) * radius;
+                    light.position.z = Math.sin(angle) * radius;
+                    light.position.y = height;
+                    
+                    treeGroup.add(light);
+                    lights.push({
+                        mesh: light,
+                        originalColor: lightMaterial.color.clone(),
+                        intensity: 0.5 + Math.random() * 0.5,
+                        speed: 0.5 + Math.random()
+                    });
+                }
+                
+                scene.add(treeGroup);
+                
+                // 更新灯光闪烁效果
+                function updateLights(time) {
+                    lights.forEach(light => {
+                        const intensity = 0.5 + 0.5 * Math.sin(time * light.speed);
+                        light.mesh.material.color.copy(light.originalColor).multiplyScalar(intensity);
+                        light.mesh.material.emissive.copy(light.mesh.material.color);
+                    });
+                }
+                
+                return { treeGroup, updateLights };
+            }
+            
+            // 创建爱心粒子系统
+            function createHeartParticles() {
+                const heartGroup = new THREE.Group();
+                
+                // 爱心形状函数
+                function heartShape(t) {
+                    const x = 16 * Math.pow(Math.sin(t), 3);
+                    const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+                    return { x: x / 16, y: y / 16 };
+                }
+                
+                // 创建爱心粒子
+                const particleCount = 500;
+                const particles = [];
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const particleGeometry = new THREE.SphereGeometry(0.05, 6, 6);
+                    const particleMaterial = new THREE.MeshLambertMaterial({ 
+                        color: 0xFF69B4,
+                        emissive: 0xFF1493
+                    });
+                    const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                    
+                    // 在爱心形状上随机分布
+                    const t = Math.random() * Math.PI * 2;
+                    const heartPos = heartShape(t);
+                    
+                    particle.position.x = heartPos.x * 5;
+                    particle.position.y = heartPos.y * 5;
+                    particle.position.z = (Math.random() - 0.5) * 2;
+                    
+                    heartGroup.add(particle);
+                    
+                    particles.push({
+                        mesh: particle,
+                        originalX: particle.position.x,
+                        originalY: particle.position.y,
+                        originalZ: particle.position.z,
+                        speed: 0.5 + Math.random() * 0.5,
+                        offset: Math.random() * Math.PI * 2
+                    });
+                }
+                
+                scene.add(heartGroup);
+                
+                // 更新爱心粒子动画
+                function updateHearts(time) {
+                    particles.forEach(particle => {
+                        const scale = 1 + 0.2 * Math.sin(time * particle.speed + particle.offset);
+                        particle.mesh.scale.set(scale, scale, scale);
+                        
+                        // 轻微浮动
+                        particle.mesh.position.y = particle.originalY + 0.2 * Math.sin(time * particle.speed * 0.5 + particle.offset);
+                    });
+                    
+                    // 整体旋转
+                    heartGroup.rotation.y = time * 0.2;
+                }
+                
+                return { heartGroup, updateHearts };
+            }
+            
+            // 创建雪花效果
+            function createSnow() {
+                const snowGroup = new THREE.Group();
+                
+                const snowCount = 300;
+                const snowflakes = [];
+                
+                for (let i = 0; i < snowCount; i++) {
+                    const snowGeometry = new THREE.SphereGeometry(0.05 + Math.random() * 0.05, 6, 6);
+                    const snowMaterial = new THREE.MeshLambertMaterial({ 
+                        color: 0xFFFFFF,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                    const snowflake = new THREE.Mesh(snowGeometry, snowMaterial);
+                    
+                    // 随机位置
+                    snowflake.position.x = (Math.random() - 0.5) * 30;
+                    snowflake.position.y = Math.random() * 20;
+                    snowflake.position.z = (Math.random() - 0.5) * 30;
+                    
+                    snowGroup.add(snowflake);
+                    
+                    snowflakes.push({
+                        mesh: snowflake,
+                        speed: 0.5 + Math.random(),
+                        rotationSpeed: (Math.random() - 0.5) * 0.02
+                    });
+                }
+                
+                scene.add(snowGroup);
+                
+                // 更新雪花动画
+                function updateSnow(time) {
+                    snowflakes.forEach(snowflake => {
+                        // 下落
+                        snowflake.mesh.position.y -= snowflake.speed * 0.02;
+                        
+                        // 旋转
+                        snowflake.mesh.rotation.x += snowflake.rotationSpeed;
+                        snowflake.mesh.rotation.y += snowflake.rotationSpeed;
+                        
+                        // 如果雪花落到底部，重置到顶部
+                        if (snowflake.mesh.position.y < -5) {
+                            snowflake.mesh.position.y = 20;
+                            snowflake.mesh.position.x = (Math.random() - 0.5) * 30;
+                            snowflake.mesh.position.z = (Math.random() - 0.5) * 30;
+                        }
+                    });
+                }
+                
+                return { snowGroup, updateSnow };
+            }
+            
+            // 创建地面
+            function createGround() {
+                const groundGeometry = new THREE.PlaneGeometry(30, 30);
+                const groundMaterial = new THREE.MeshLambertMaterial({ 
+                    color: 0x2F4F2F,
+                    side: THREE.DoubleSide
+                });
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = Math.PI / 2;
+                ground.position.y = -1;
+                scene.add(ground);
+            }
+            
+            // 初始化所有元素
+            const tree = createChristmasTree();
+            const hearts = createHeartParticles();
+            const snow = createSnow();
+            createGround();
+            
+            // 动画循环
+            function animate(time) {
+                requestAnimationFrame(animate);
+                
+                const elapsedTime = time * 0.001;
+                
+                // 更新元素
+                tree.updateLights(elapsedTime);
+                hearts.updateHearts(elapsedTime);
+                snow.updateSnow(elapsedTime);
+                
+                // 轻微旋转相机
+                camera.position.x = Math.sin(elapsedTime * 0.1) * 15;
+                camera.position.z = Math.cos(elapsedTime * 0.1) * 15;
+                camera.lookAt(0, 5, 0);
+                
+                renderer.render(scene, camera);
+            }
+            
+            animate(0);
+            
+            // 响应窗口大小变化
+            window.addEventListener('resize', function() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        });
+    </script>
+</body>
+</html>
